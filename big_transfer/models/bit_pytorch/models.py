@@ -15,7 +15,10 @@
 # Lint as: python3
 """Bottleneck ResNet v2 with GroupNorm and Weight Standardization."""
 
-from collections import OrderedDict  # pylint: disable=g-importing-member
+from collections import OrderedDict
+import os
+import sys
+import numpy as np  # pylint: disable=g-importing-member
 
 import torch
 import torch.nn as nn
@@ -188,3 +191,36 @@ KNOWN_MODELS = OrderedDict([
     ('BiT-S-R152x2', lambda *a, **kw: ResNetV2([3, 8, 36, 3], 2, *a, **kw)),
     ('BiT-S-R152x4', lambda *a, **kw: ResNetV2([3, 8, 36, 3], 4, *a, **kw)),
 ])
+
+
+def get_model_list():
+  return KNOWN_MODELS.keys()
+
+def load_trained_model(weight_path: str, model_name:str, num_classes: int):
+
+  if model_name not in get_model_list():
+    print("Pretrained model not found.")
+    print(f"Accepted models: {list(KNOWN_MODELS.keys())}")
+    sys.exit()
+
+
+  print(f"Loading model from {weight_path}")
+  try:
+      model = KNOWN_MODELS[model_name](
+          head_size=num_classes, zero_head=True
+      )
+  except KeyError:
+      print(f"Accepted models: {list(KNOWN_MODELS.keys())}")
+      return
+
+  file_path = weight_path
+  if os.path.exists(file_path):
+      model.load_from(np.load(file_path))
+  else:
+      print(f"Model file {file_path} not found")
+      url = f"https://storage.googleapis.com/bit_models/{model_name}.npz"
+      print("You can downloadit it from:", url)
+      return
+
+  return model
+
