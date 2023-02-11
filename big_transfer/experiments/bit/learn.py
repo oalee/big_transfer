@@ -20,7 +20,7 @@ val_set = tv.datasets.CIFAR10(env["datadir"], train=False, transform=val_transfo
 train_set, val_set, train_loader, val_loader = mini_batch_fewshot(
     train_set=data_set,
     valid_set=val_set,
-    examples_per_class=2,  # Fewshot disabled
+    examples_per_class=None,  # Fewshot enabled
     batch=128,
     batch_split=2,
     workers=os.cpu_count(),  # Auto-val to cpu count

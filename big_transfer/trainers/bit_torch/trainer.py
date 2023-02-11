@@ -185,6 +185,7 @@ def train(
             lr = get_lr(step, train_set_size, base_lr)
 
             if lr is None:
+                print("LR NOT FOUND! ERROR!")
                 break
             for param_group in optim.param_groups:
                 param_group["lr"] = lr
@@ -208,7 +209,7 @@ def train(
 
             accstep = f" ({accum_steps}/{batch_split})" if batch_split > 1 else ""
             logger.info(
-                f"[step {step}{accstep}]: loss={c_num:.5f} (lr={lr:.1e})"
+                f"[step {step}{accstep}]: loss={c_num:.9f} (lr={lr:.1e})"
             )  # pylint: disable=logging-format-interpolation
             # logger.flush()
 
