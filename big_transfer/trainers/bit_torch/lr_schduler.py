@@ -54,7 +54,7 @@ def get_lr(step, dataset_size, base_lr=0.003):
     return base_lr * step / supports[0]
   # End of training
   elif step >= supports[-1]:
-    return None
+    return base_lr
   # Staircase decays by factor of 10
   else:
     for s in supports[1:]:

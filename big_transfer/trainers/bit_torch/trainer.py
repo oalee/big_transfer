@@ -23,9 +23,14 @@ import time
 import numpy as np
 import torch
 import torchvision as tv
+from torch.utils import data
 
-from ...models.bit_pytorch import fewshot as fs, lbtoolbox as lb, models as models
-from .bit_hyperrule import get_lr, get_mixup, get_resolution_from_dataset
+from .lbtoolbox import Uninterrupt
+from .lr_schduler import (
+    get_lr,
+    get_mixup,
+)
+
 
 def topk(output, target, ks=(1,)):
     """Returns one boolean vector for each k, whether the target is within the output's top-k."""
@@ -41,102 +46,6 @@ def recycle(iterable):
         for i in iterable:
             yield i
 
-
-def mktrainval(
-    dataset: str,
-    datadir: str,
-    examples_per_class: int,
-    batch: int,
-    batch_split: int,
-    workers: int,
-    logger,
-):
-    """Returns train and validation datasets."""
-    precrop, crop = get_resolution_from_dataset(dataset)
-    train_tx = tv.transforms.Compose(
-        [
-            tv.transforms.Resize((precrop, precrop)),
-            tv.transforms.RandomCrop((crop, crop)),
-            tv.transforms.RandomHorizontalFlip(),
-            tv.transforms.ToTensor(),
-            tv.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        ]
-    )
-    val_tx = tv.transforms.Compose(
-        [
-            tv.transforms.Resize((crop, crop)),
-            tv.transforms.ToTensor(),
-            tv.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        ]
-    )
-
-    if dataset == "cifar10":
-        train_set = tv.datasets.CIFAR10(
-            datadir, transform=train_tx, train=True, download=True
-        )
-        valid_set = tv.datasets.CIFAR10(
-            datadir, transform=val_tx, train=False, download=True
-        )
-    elif dataset == "cifar100":
-        train_set = tv.datasets.CIFAR100(
-            datadir, transform=train_tx, train=True, download=True
-        )
-        valid_set = tv.datasets.CIFAR100(
-            datadir, transform=val_tx, train=False, download=True
-        )
-    elif dataset == "imagenet2012":
-        train_set = tv.datasets.ImageFolder(pjoin(datadir, "train"), train_tx)
-        valid_set = tv.datasets.ImageFolder(pjoin(datadir, "val"), val_tx)
-    else:
-        raise ValueError(
-            f"Sorry, we have not spent time implementing the "
-            f"{dataset} dataset in the PyTorch codebase. "
-            f"In principle, it should be easy to add :)"
-        )
-
-    if examples_per_class is not None:
-        logger.info(f"Looking for {examples_per_class} images per class...")
-        indices = fs.find_fewshot_indices(train_set, examples_per_class)
-        train_set = torch.utils.data.Subset(train_set, indices=indices)
-
-    logger.info(f"Using a training set with {len(train_set)} images.")
-    logger.info(f"Using a validation set with {len(valid_set)} images.")
-
-    micro_batch_size = batch // batch_split
-
-    valid_loader = torch.utils.data.DataLoader(
-        valid_set,
-        batch_size=micro_batch_size,
-        shuffle=False,
-        num_workers=workers,
-        pin_memory=True,
-        drop_last=False,
-    )
-
-    if micro_batch_size <= len(train_set):
-        train_loader = torch.utils.data.DataLoader(
-            train_set,
-            batch_size=micro_batch_size,
-            shuffle=True,
-            num_workers=workers,
-            pin_memory=True,
-            drop_last=False,
-        )
-    else:
-        # In the few-shot cases, the total dataset size might be smaller than the batch-size.
-        # In these cases, the default sampler doesn't repeat, so we need to make it do that
-        # if we want to match the behaviour from the paper.
-        train_loader = torch.utils.data.DataLoader(
-            train_set,
-            batch_size=micro_batch_size,
-            num_workers=workers,
-            pin_memory=True,
-            sampler=torch.utils.data.RandomSampler(
-                train_set, replacement=True, num_samples=micro_batch_size
-            ),
-        )
-
-    return train_set, valid_set, train_loader, valid_loader
 
 
 def run_eval(model, data_loader, device, chrono, logger, step, ologger=None):
@@ -163,7 +72,6 @@ def run_eval(model, data_loader, device, chrono, logger, step, ologger=None):
                 all_c.extend(c.cpu())  # Also ensures a sync point.
                 all_top1.extend(top1.cpu())
                 all_top5.extend(top5.cpu())
-                
 
         # measure elapsed time
         end = time.time()
@@ -197,26 +105,19 @@ def mixup_criterion(criterion, pred, y_a, y_b, l):
     return l * criterion(pred, y_a) + (1 - l) * criterion(pred, y_b)
 
 
-
-
-
-
 def train(
-    logdir: str,
-    name: str,
-    model: str,
-    dataset: str,
-    datadir: str,
-    examples_per_class: int,
-    batch: int,
+    model: torch.nn.Module,
+    train_loader: data.Dataset,
+    valid_loader: data.Dataset,
+    train_set_size: int,
+    save: bool,
+    save_path: str,
     batch_split: int,
-    workers: int,
     base_lr: float,
     eval_every: int,
-    save: bool,
-    ologger = None
+    tensorboardlogger=None,
 ):
-    logger = ologger
+    logger = tensorboardlogger
     logger.__setattr__("info", print)
 
     # Lets cuDNN benchmark conv implementations and choose the fastest.
@@ -226,33 +127,6 @@ def train(
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     logger.info(f"Going to train on {device}")
 
-    train_set, valid_set, train_loader, valid_loader = mktrainval(
-        dataset, datadir, examples_per_class, batch, batch_split, workers, logger
-    )
-
-    model_name = model
-    logger.info(f"Loading model from {model_name}.npz")
-    try:
-        model = models.KNOWN_MODELS[model](
-            head_size=len(valid_set.classes), zero_head=True
-        )
-    except KeyError:
-        print(f"Accepted models: {list(models.KNOWN_MODELS.keys())}")
-        return
-    
-    file_path = f"{model_name}.npz"
-    if os.path.exists(file_path):
-        model.load_from(np.load(file_path))
-    else:
-        print(f"Model file {file_path} not found")
-        # url wget https://storage.googleapis.com/bit_models/BiT-M-R50x1.{npz|h5}
-        url = f"https://storage.googleapis.com/bit_models/{model_name}.npz"
-       
-        print("Download it from ", url)
-        return
-
-
-        # return
 
     # model.load_from(np.load(f"{model_name}.npz"))
 
@@ -268,7 +142,7 @@ def train(
     optim = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9)
 
     # Resume fine-tuning if we find a saved model.
-    savename = pjoin(logdir, name, "bit.pth.tar")
+    savename = save_path
     try:
         logger.info(f"Model will be saved in '{savename}'")
         checkpoint = torch.load(savename, map_location="cpu")
@@ -285,7 +159,7 @@ def train(
     optim.zero_grad()
 
     model.train()
-    mixup = get_mixup(len(train_set))
+    mixup = get_mixup(train_set_size)
     cri = torch.nn.CrossEntropyLoss().to(device)
 
     logger.info("Starting training!")
@@ -294,7 +168,9 @@ def train(
     mixup_l = np.random.beta(mixup, mixup) if mixup > 0 else 1
     end = time.time()
 
-    with lb.Uninterrupt() as u:
+    # reset intrupt at first:
+
+    with Uninterrupt() as u:
         for x, y in recycle(train_loader):
             # measure data loading time, which is spent in the `for` statement.
             chrono._done("load", time.time() - end)
@@ -306,8 +182,8 @@ def train(
             x = x.to(device, non_blocking=True)
             y = y.to(device, non_blocking=True)
 
-            # Update learning-rate, including stop training if over.
-            lr = get_lr(step, len(train_set), base_lr)
+            lr = get_lr(step, train_set_size, base_lr)
+
             if lr is None:
                 break
             for param_group in optim.param_groups:
@@ -330,18 +206,15 @@ def train(
                 (c / batch_split).backward()
                 accum_steps += 1
 
-            accstep = (
-                f" ({accum_steps}/{batch_split})" if batch_split > 1 else ""
-            )
+            accstep = f" ({accum_steps}/{batch_split})" if batch_split > 1 else ""
             logger.info(
                 f"[step {step}{accstep}]: loss={c_num:.5f} (lr={lr:.1e})"
             )  # pylint: disable=logging-format-interpolation
-            logger.flush()
+            # logger.flush()
 
-            if ologger is not None:
-                ologger.add_scalar("Loss/train", c_num, step)
-                ologger.add_scalar("Learning rate", lr, step)
-
+            if tensorboardlogger is not None:
+                tensorboardlogger.add_scalar("Loss/train", c_num, step)
+                tensorboardlogger.add_scalar("Learning rate", lr, step)
 
             # Update params
             if accum_steps == batch_split:
@@ -355,7 +228,7 @@ def train(
 
                 # Run evaluation and save the model.
                 if eval_every and step % eval_every == 0:
-                    run_eval(model, valid_loader, device, chrono, logger, step, ologger)
+                    run_eval(model, valid_loader, device, chrono, logger, step, tensorboardlogger)
                     if save:
                         torch.save(
                             {
@@ -370,7 +243,7 @@ def train(
 
         # Final eval at end of training.
         run_eval(model, valid_loader, device, chrono, logger, step="end")
+        u.release()
+
 
     logger.info(f"Timings:\n{chrono}")
-
-
