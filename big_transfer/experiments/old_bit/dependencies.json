@@ -1,9 +1,0 @@
-{
-    "dependencies": [
-        "https://github.com/oalee/big_transfer/tree/master/big_transfer/trainers/bit_torch/trainer",
-        "https://github.com/oalee/big_transfer/tree/master/big_transfer/models/bit_pytorch/models",
-        "https://github.com/oalee/big_transfer/tree/master/big_transfer/trainers/bit_torch",
-        "https://github.com/oalee/big_transfer/tree/master/big_transfer/data/bit"
-    ],
-    "env": {}
-}

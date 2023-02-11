@@ -1,7 +1,0 @@
-{
-    "dependencies": [
-        "https://github.com/oalee/big_transfer/tree/master/big_transfer/bit_torch/lr_schduler",
-        "https://github.com/oalee/big_transfer/tree/master/big_transfer/models/bit_pytorch"
-    ],
-    "env": {}
-}
