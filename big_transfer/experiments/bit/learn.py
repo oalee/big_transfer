@@ -1,5 +1,5 @@
 from ...trainers.bit_torch.trainer import train
-from ...models.bit_pytorch.models import load_trained_model, get_model_list
+from ...models.bit_torch.models import load_trained_model, get_model_list
 from ...data.bit import get_transforms, mini_batch_fewshot
 import torchvision as tv, yerbamate, os
 from torch.utils.tensorboard import SummaryWriter
