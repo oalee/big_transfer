@@ -9,7 +9,6 @@ if env.train:
     # Create a logger.
     workers = os.cpu_count()
     logger = SummaryWriter(log_dir=env["results"], comment=env.name)
-
     train(
         logdir=env["results"],
         name=env.name,
@@ -20,7 +19,7 @@ if env.train:
         batch=128,
         batch_split=2,
         workers=workers,
-        base_lr=0.003,
+        base_lr=0.001,
         eval_every=100,
         save=True,
         ologger=logger,

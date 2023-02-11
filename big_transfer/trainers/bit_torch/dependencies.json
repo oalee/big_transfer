@@ -1,0 +1,6 @@
+{
+    "dependencies": [
+        "https://github.com/oalee/big_transfer/tree/master/big_transfer/models/bit_pytorch"
+    ],
+    "env": {}
+}
