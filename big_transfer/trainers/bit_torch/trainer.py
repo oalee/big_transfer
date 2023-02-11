@@ -25,7 +25,7 @@ import torch
 import torchvision as tv
 from torch.utils import data
 
-from .lbtoolbox import Uninterrupt
+from .lbtoolbox import Uninterrupt, Chrono
 from .lr_schduler import (
     get_lr,
     get_mixup,
@@ -163,7 +163,7 @@ def train(
     cri = torch.nn.CrossEntropyLoss().to(device)
 
     logger.info("Starting training!")
-    chrono = lb.Chrono()
+    chrono = Chrono()
     accum_steps = 0
     mixup_l = np.random.beta(mixup, mixup) if mixup > 0 else 1
     end = time.time()
