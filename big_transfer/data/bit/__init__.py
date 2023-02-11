@@ -1,2 +1,2 @@
 from .minibatch_fewshot import mini_batch_fewshot
-from .transforms import get_transforms
+from .transforms import get_transforms, timm_transforms

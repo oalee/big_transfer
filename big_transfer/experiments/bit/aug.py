@@ -1,17 +1,25 @@
 from ...trainers.bit_torch.trainer import train
 from ...models.bit_torch.models import load_trained_model, get_model_list
-from ...data.bit import get_transforms, mini_batch_fewshot
+from ...data.bit import get_transforms, mini_batch_fewshot, timm_transforms
 import torchvision as tv, yerbamate, os
 from torch.utils.tensorboard import SummaryWriter
+import torchvision
+from torchvision import transforms
+from timm.data.auto_augment import augment_and_mix_transform, auto_augment_transform
 
 # BigTransfer Medium ResNet50 Width 1
-model_name = "BiT-M-R50x1" 
+model_name = "BiT-M-R50x1"
 # Choose a model form get_model_list that can fit in to your memoery
-# Try "BiT-S-R50x1" if this doesn't works for you 
+# Try "BiT-S-R50x1" if this doesn't works for you
 
 env = yerbamate.Environment()
 
-train_transform, val_transform = get_transforms(img_size=[32, 32])
+image_size = [32, 32]
+
+
+train_transform, val_transform = timm_transforms(
+    image_size=[32, 32], transform=augment_and_mix_transform("augmix-m4-w3-d3", {})
+)
 data_set = tv.datasets.CIFAR10(
     env["datadir"], train=True, download=True, transform=train_transform
 )
