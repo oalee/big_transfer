@@ -1,5 +1,4 @@
 import torchvision as tv
-from timm.data.auto_augment import augment_and_mix_transform, auto_augment_transform
 
 
 def get_resolution(original_resolution):

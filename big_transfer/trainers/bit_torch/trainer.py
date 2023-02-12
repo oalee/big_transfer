@@ -16,6 +16,7 @@
 """Fine-tune a BiT model on some downstream dataset."""
 #!/usr/bin/env python3
 # coding: utf-8
+import logging
 import os
 from os.path import join as pjoin  # pylint: disable=g-importing-member
 import time
@@ -30,6 +31,7 @@ from .lr_schduler import (
     get_lr,
     get_mixup,
 )
+from .logger import setup_logger
 
 
 def topk(output, target, ks=(1,)):
@@ -46,6 +48,8 @@ def recycle(iterable):
         for i in iterable:
             yield i
 
+
+last_top1 = 0
 
 
 def run_eval(model, data_loader, device, chrono, logger, step, ologger=None):
@@ -73,13 +77,24 @@ def run_eval(model, data_loader, device, chrono, logger, step, ologger=None):
                 all_top1.extend(top1.cpu())
                 all_top5.extend(top5.cpu())
 
+                loss = torch.stack([c]).mean()
+                acc = sum(top1) / len(top1)
+                # import ipdbsace()
+                logger.info(
+                    f"Validation@{step} batch {b} loss {loss.item():.5f}, "
+                    f"top1 {acc.item():.2%}, "
+                    # f"top5 {all_top5:.2%}"
+                )
+
         # measure elapsed time
         end = time.time()
+    global last_top1
+    last_top1 = np.mean(all_top1)
 
     model.train()
     logger.info(
         f"Validation@{step} loss {np.mean(all_c):.5f}, "
-        f"top1 {np.mean(all_top1):.2%}, "
+        f"top1 {last_top1:.2%}, "
         f"top5 {np.mean(all_top5):.2%}"
     )
     logger.flush()
@@ -105,6 +120,61 @@ def mixup_criterion(criterion, pred, y_a, y_b, l):
     return l * criterion(pred, y_a) + (1 - l) * criterion(pred, y_b)
 
 
+def test(
+    model: torch.nn.Module,
+    val_loader: data.Dataset,
+    save_path: str,
+    log_path: str,
+    tensorboardlogger=None,
+):
+    logger = setup_logger(log_path)
+
+    torch.backends.cudnn.benchmark = True
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    logger.info(f"Going to train on {device}")
+
+    # model.load_from(np.load(f"{model_name}.npz"))
+
+    logger.info("Moving model onto all GPUs")
+    model = torch.nn.DataParallel(model)
+
+    # Optionally resume from a checkpoint.
+    # Load it to CPU first as we'll move the model to GPU later.
+    # This way, we save a little bit of GPU memory when loading.
+    step = 0
+
+    # Note: no weight-decay!
+    optim = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9)
+
+    # Resume fine-tuning if we find a saved model.
+    savename = save_path
+    try:
+        logger.info(f"Model will be saved in '{savename}'")
+        checkpoint = torch.load(savename, map_location="cpu")
+        logger.info(f"Found saved model to resume from at '{savename}'")
+
+        step = checkpoint["step"]
+        model.load_state_dict(checkpoint["model"])
+        optim.load_state_dict(checkpoint["optim"])
+        logger.info(f"Resumed at step {step}")
+    except FileNotFoundError:
+        logger.info("Fine-tuning from BiT")
+
+    model = model.to(device)
+    chrono = Chrono()
+
+    run_eval(
+        model,
+        val_loader,
+        device,
+        chrono,
+        logger,
+        step,
+        tensorboardlogger,
+    )
+
+
 def train(
     model: torch.nn.Module,
     train_loader: data.Dataset,
@@ -115,18 +185,15 @@ def train(
     batch_split: int,
     base_lr: float,
     eval_every: int,
+    log_path: str,
     tensorboardlogger=None,
 ):
-    logger = tensorboardlogger
-    logger.__setattr__("info", print)
+    logger = setup_logger(log_path)
 
-    # Lets cuDNN benchmark conv implementations and choose the fastest.
-    # Only good if sizes stay the same within the main loop!
     torch.backends.cudnn.benchmark = True
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     logger.info(f"Going to train on {device}")
-
 
     # model.load_from(np.load(f"{model_name}.npz"))
 
@@ -169,9 +236,11 @@ def train(
     end = time.time()
 
     # reset intrupt at first:
+    global last_top1
+    import tqdm
 
     with Uninterrupt() as u:
-        for x, y in recycle(train_loader):
+        for (x, y) in recycle(train_loader):
             # measure data loading time, which is spent in the `for` statement.
             chrono._done("load", time.time() - end)
 
@@ -208,11 +277,17 @@ def train(
                 accum_steps += 1
 
             accstep = f" ({accum_steps}/{batch_split})" if batch_split > 1 else ""
-            logger.info(
-                f"[step {step}{accstep}]: loss={c_num:.9f} (lr={lr:.1e})"
-            )  # pylint: disable=logging-format-interpolation
-            # logger.flush()
+           
+            # tqdm.tqdm.write(
+            #     f"[step {step}{accstep}]: loss={c_num:.9f} (lr={lr:.1e} (val_top1={last_top1:.2%}))"
+            # )
 
+            logger.info(
+                f"[step {step}{accstep}]: loss={c_num:.9f} (lr={lr:.1e} (val_top1={last_top1:.2%}))"
+            )  # pylint: disable=logging-format-interpolation
+            logger.flush()
+            
+            
             if tensorboardlogger is not None:
                 tensorboardlogger.add_scalar("Loss/train", c_num, step)
                 tensorboardlogger.add_scalar("Learning rate", lr, step)
@@ -229,7 +304,15 @@ def train(
 
                 # Run evaluation and save the model.
                 if eval_every and step % eval_every == 0:
-                    run_eval(model, valid_loader, device, chrono, logger, step, tensorboardlogger)
+                    run_eval(
+                        model,
+                        valid_loader,
+                        device,
+                        chrono,
+                        logger,
+                        step,
+                        tensorboardlogger,
+                    )
                     if save:
                         torch.save(
                             {
@@ -245,6 +328,5 @@ def train(
         # Final eval at end of training.
         run_eval(model, valid_loader, device, chrono, logger, step="end")
         u.release()
-
 
     logger.info(f"Timings:\n{chrono}")

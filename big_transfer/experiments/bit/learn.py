@@ -1,13 +1,14 @@
-from ...trainers.bit_torch.trainer import train
+from ...trainers.bit_torch.trainer import test, train
 from ...models.bit_torch.models import load_trained_model, get_model_list
 from ...data.bit import get_transforms, mini_batch_fewshot
 import torchvision as tv, yerbamate, os
 from torch.utils.tensorboard import SummaryWriter
 
+
 # BigTransfer Medium ResNet50 Width 1
-model_name = "BiT-M-R50x1" 
+model_name = "BiT-M-R50x1"
 # Choose a model form get_model_list that can fit in to your memoery
-# Try "BiT-S-R50x1" if this doesn't works for you 
+# Try "BiT-S-R50x1" if this doesn't works for you
 
 env = yerbamate.Environment()
 
@@ -43,5 +44,15 @@ if env.train:
         batch_split=2,
         base_lr=0.003,
         eval_every=100,
+        log_path=os.path.join(env["results"], "log.txt"),
+        tensorboardlogger=logger,
+    )
+
+if env.test:
+    test(
+        model=model,
+        val_loader=val_loader,
+        save_path=os.path.join(env["results"], f"trained_{model_name}.pt"),
+        log_path=os.path.join(env["results"], "log.txt"),
         tensorboardlogger=logger,
     )

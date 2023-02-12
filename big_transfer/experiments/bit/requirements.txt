@@ -1,3 +1,4 @@
 --extra-index-url https://download.pytorch.org/whl/torch_stable.html
-torchvision~=0.13.1
 torch~=1.12.1
+timm~=0.6.12
+torchvision~=0.13.1
