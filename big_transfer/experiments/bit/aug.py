@@ -7,6 +7,7 @@ import torchvision
 from torchvision import transforms
 from timm.data.auto_augment import augment_and_mix_transform, auto_augment_transform
 
+
 # BigTransfer Medium ResNet50 Width 1
 model_name = "BiT-M-R50x1"
 # Choose a model form get_model_list that can fit in to your memoery
@@ -15,7 +16,6 @@ model_name = "BiT-M-R50x1"
 env = yerbamate.Environment()
 
 image_size = [32, 32]
-
 
 train_transform, val_transform = timm_transforms(
     image_size=[32, 32], transform=augment_and_mix_transform("augmix-m4-w2-d2", {})
@@ -28,7 +28,7 @@ val_set = tv.datasets.CIFAR10(env["datadir"], train=False, transform=val_transfo
 train_set, val_set, train_loader, val_loader = mini_batch_fewshot(
     train_set=data_set,
     valid_set=val_set,
-    examples_per_class=None,  # Fewshot disabled
+    examples_per_class=3,  # Fewshot disabled
     batch=128,
     batch_split=2,
     workers=os.cpu_count(),  # Auto-val to cpu count

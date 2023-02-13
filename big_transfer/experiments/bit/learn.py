@@ -42,7 +42,7 @@ if env.train:
         save=True,
         save_path=os.path.join(env["results"], f"trained_{model_name}.pt"),
         batch_split=2,
-        base_lr=0.003,
+        base_lr=0.001,
         eval_every=100,
         log_path=os.path.join(env["results"], "log.txt"),
         tensorboardlogger=logger,
