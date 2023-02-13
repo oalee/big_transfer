@@ -1,6 +1,27 @@
-## Big Transfer (BiT): General Visual Representation Learning
-*by Alexander Kolesnikov, Lucas Beyer, Xiaohua Zhai, Joan Puigcerver, Jessica Yung, Sylvain Gelly, Neil Houlsby*
+Clone Repository for Big Transfer (BiT): General Visual Representation Learning
 
+This repository provides the code and models from the paper "Big Transfer (BiT): General Visual Representation Learning" by Alexander Kolesnikov, Lucas Beyer, Xiaohua Zhai, Joan Puigcerver, Jessica Yung, Sylvain Gelly, and Neil Houlsby.
+
+**Update 13/02/2023:** 
+Code base refactored to modular structure, see [Maté](https://github.com/oalee/yerbamate).
+
+### Installation
+
+To install the source base, you can clone the repo, or use maté:
+
+```bash
+mate install oalee/big_transfer/experiments/bit -yo pip
+
+mate train bit learn
+```
+
+### Exportable Code modules:
+|    | type        | name      | url                                                                               | short_url                             | dependencies                                                                                                                                                                                                                                                                                                                                                                               |
+|----|-------------|-----------|-----------------------------------------------------------------------------------|---------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 0  | models      | bit_torch | https://github.com/oalee/big_transfer/tree/master/big_transfer/models/bit_torch   | oalee/big_transfer/models/bit_torch   | ['--extra-index-url https://download.pytorch.org/whl/torch_stable.html', 'requests~=2.28.1', 'torch~=1.12.1', 'click~=8.1.3', 'numpy~=1.24.1', 'tqdm~=4.64.1']                                                                                                                                                                                                                             |
+| 1  | trainers    | bit_torch | https://github.com/oalee/big_transfer/tree/master/big_transfer/trainers/bit_torch | oalee/big_transfer/trainers/bit_torch | ['--extra-index-url https://download.pytorch.org/whl/torch_stable.html', 'numpy~=1.24.1', 'torch~=1.12.1', 'tqdm~=4.64.1', 'torchvision~=0.13.1']                                                                                                                                                                                                                                          |
+| 2  | data        | bit       | https://github.com/oalee/big_transfer/tree/master/big_transfer/data/bit           | oalee/big_transfer/data/bit           | ['--extra-index-url https://download.pytorch.org/whl/torch_stable.html', 'torch~=1.12.1', 'torchvision~=0.13.1']                                                                                                                                                                                                                                                                           |
+| 3  | experiments | bit       | https://github.com/oalee/big_transfer/tree/master/big_transfer/experiments/bit    | oalee/big_transfer/experiments/bit    | ['--extra-index-url https://download.pytorch.org/whl/torch_stable.html', 'torch~=1.12.1', 'tensorboard~=2.10.0', 'torchvision~=0.13.1', 'https://github.com/oalee/big_transfer/tree/master/big_transfer/models/bit_torch', 'https://github.com/oalee/big_transfer/tree/master/big_transfer/trainers/bit_torch', 'https://github.com/oalee/big_transfer/tree/master/big_transfer/data/bit'] |
 
 **Update 18/06/2021:** We release new high performing BiT-R50x1 models, which were distilled from BiT-M-R152x2, see [this section](#distilled-models). More details in our [paper "Knowledge distillation: A good teacher is patient and consistent"](https://arxiv.org/abs/2106.05237).
 
