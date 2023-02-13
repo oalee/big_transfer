@@ -15,7 +15,7 @@ mate install oalee/big_transfer/experiments/bit -yo pip
 mate train bit learn
 ```
 
-### Exportable Code modules:
+### Exported modules
 |    | type        | name      | url                                                                               | short_url                             | dependencies                                                                                                                                                                                                                                                                                                                                                                               |
 |----|-------------|-----------|-----------------------------------------------------------------------------------|---------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 0  | models      | bit_torch | https://github.com/oalee/big_transfer/tree/master/big_transfer/models/bit_torch   | oalee/big_transfer/models/bit_torch   | ['--extra-index-url https://download.pytorch.org/whl/torch_stable.html', 'requests~=2.28.1', 'torch~=1.12.1', 'click~=8.1.3', 'numpy~=1.24.1', 'tqdm~=4.64.1']                                                                                                                                                                                                                             |
