@@ -2,8 +2,9 @@ from ...trainers.bit_torch.trainer import test, train
 from ...models.bit_torch.models import load_trained_model, get_model_list
 from ...data.bit import get_transforms, mini_batch_fewshot
 import torchvision as tv, yerbamate, os
-from torch.utils.tensorboard import SummaryWriter
 
+from torch.utils.tensorboard import SummaryWriter
+import tensorboard
 
 # BigTransfer Medium ResNet50 Width 1
 model_name = "BiT-M-R50x1"
