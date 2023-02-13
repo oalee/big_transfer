@@ -1,8 +1,8 @@
 {
     "dependencies": [
         "https://github.com/oalee/big_transfer/tree/master/big_transfer/data/bit",
-        "https://github.com/oalee/big_transfer/tree/master/big_transfer/trainers/bit_torch",
-        "https://github.com/oalee/big_transfer/tree/master/big_transfer/models/bit_torch"
+        "https://github.com/oalee/big_transfer/tree/master/big_transfer/models/bit_torch",
+        "https://github.com/oalee/big_transfer/tree/master/big_transfer/trainers/bit_torch"
     ],
     "env": {}
 }
